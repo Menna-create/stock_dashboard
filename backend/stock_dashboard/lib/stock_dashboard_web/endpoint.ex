@@ -11,6 +11,14 @@ defmodule StockDashboardWeb.Endpoint do
     same_site: "Lax"
   ]
 
+  # Socket for Phoenix Channels (e.g., our StockChannel)
+  # This is different from the LiveView socket.
+  # The path "/socket" is the default that phoenix.js client will connect to.
+  socket "/socket", StockDashboardWeb.UserSocket,
+    websocket: true, # You can adjust timeout
+    longpoll: false # Set to true if you need longpoll fallback
+
+  # Socket for Phoenix LiveView
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
@@ -24,6 +32,11 @@ defmodule StockDashboardWeb.Endpoint do
     from: :stock_dashboard,
     gzip: false,
     only: StockDashboardWeb.static_paths()
+
+  # Add CORSPlug before the router and before any plugs that might terminate the
+  # request early
+  # This is crucial for allowing your Svelte frontend (on a different port) to connect.
+  plug CORSPlug
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

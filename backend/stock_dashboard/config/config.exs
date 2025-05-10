@@ -22,6 +22,14 @@ config :stock_dashboard, StockDashboardWeb.Endpoint,
   pubsub_server: StockDashboard.PubSub,
   live_view: [signing_salt: "EOxlcNZ9"]
 
+# Configures CORS for frontend connections
+config :cors_plug,
+  origin: ["http://localhost:5173"], # Default SvelteKit dev port
+  max_age: 86400,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  headers: ["Content-Type", "Authorization"],
+  credentials: true
+
 # Configures the mailer
 #
 # By default it uses the "Local" adapter which stores the emails
