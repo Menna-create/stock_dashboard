@@ -25,13 +25,13 @@ defmodule StockDashboardWeb.Endpoint do
     gzip: false,
     only: StockDashboardWeb.static_paths()
 
-  # CORS configuration - fixed syntax
-  plug Corsica,
-    origins: ["http://localhost:5173", "http://localhost:4000"],
-    allow_credentials: true,
-    allow_methods: [:get, :post, :put, :patch, :delete, :options],
-    allow_headers: ["*"],
-    max_age: 86400
+  # CORS configuration (proper implementation)
+  plug CORSPlug,
+    origin: ["http://localhost:5173", "http://localhost:4000"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    headers: ["*"],
+    max_age: 86400,
+    credentials: true
 
   # Code reloading
   if code_reloading? do
