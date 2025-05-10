@@ -46,7 +46,7 @@ defmodule StockDashboard.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
-      {:finnhub, "~> 1.0.0"},
+      {:finnhub_ex, "~> 0.1"}, # Corrected package name
       {:phoenix_pubsub, "~> 2.0"},
       {:plug_cowboy, "~> 2.5"},                                                                
       {:jason, "~> 1.2"},
