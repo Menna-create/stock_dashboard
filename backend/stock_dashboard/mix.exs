@@ -19,7 +19,7 @@ defmodule StockDashboard.MixProject do
   def application do
     [
       mod: {StockDashboard.Application, []},
-      extra_applications: [:logger, :runtime_tools, :plug]
+      extra_applications: [:logger, :runtime_tools, :plug, :cors_plug]
     ]
   end
 
