@@ -1,5 +1,7 @@
 defmodule StockDashboardWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :stock_dashboard
+   alias CORSPlug
+  
 
   @session_options [
     store: :cookie,
