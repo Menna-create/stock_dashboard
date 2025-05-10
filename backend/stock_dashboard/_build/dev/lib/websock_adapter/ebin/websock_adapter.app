@@ -1,5 +1,6 @@
 {application,websock_adapter,
              [{modules,['Elixir.WebSockAdapter',
+                        'Elixir.WebSockAdapter.CowboyAdapter',
                         'Elixir.WebSockAdapter.UpgradeError',
                         'Elixir.WebSockAdapter.UpgradeValidation']},
               {optional_applications,[bandit,plug_cowboy]},
