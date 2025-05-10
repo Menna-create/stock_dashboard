@@ -6,10 +6,9 @@
 
 # General application configuration
 import Config
-config :stock_dashboard, :finnhub,
-  api_key: System.get_env("FINNHUB_API_KEY") || "d0fpqo9r01qr6dbtj200d0fpqo9r01qr6dbtj20g"
 
 config :stock_dashboard,
+  finnhub_api_key: System.get_env("FINNHUB_API_KEY") || "d0fpqo9r01qr6dbtj200d0fpqo9r01qr6dbtj20g",
   ecto_repos: [StockDashboard.Repo],
   generators: [timestamp_type: :utc_datetime]
 
