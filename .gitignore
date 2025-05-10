@@ -1,0 +1,37 @@
+.aider*
+
+# Elixir and Phoenix specific                                                           
+/_build/                                                                                
+/deps/                                                                                  
+/priv/static/assets.*                                                                   
+/priv/static/cache_manifest.json                                                        
+erl_crash.dump                                                                          
+*.ez                                                                                    
+*.beam                                                                                  
+                                                                                        
+# Mix specific                                                                          
+mix.lock                                                                                
+mix.exs.bak # Backup file for mix.exs                                                   
+                                                                                        
+# Distillery/Releases specific (if you use them later)                                  
+_build/prod/rel/                                                                        
+                                                                                        
+# Test specific                                                                         
+/cover/                                                                                 
+                                                                                        
+# Local configuration (often sensitive)                                                 
+/config/dev.secret.exs                                                                  
+/config/test.secret.exs                                                                 
+/config/prod.secret.exs # If you don't check in prod secrets                            
+                                                                                        
+# IDE / Editor specific                                                                 
+.idea/                                                                                  
+.vscode/                                                                                
+*.swp                                                                                   
+*~                                                                                      
+.DS_Store                                                                               
+                                                                                        
+# Operating System files                                                                
+Thumbs.db                                                                               
+ehthumbs.db                                                                             
+Desktop.ini    
