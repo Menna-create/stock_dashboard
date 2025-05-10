@@ -43,6 +43,7 @@ defmodule StockDashboard.MixProject do
       {:gettext, "~> 0.26"},
       {:finnhub_api, "~> 1.0.0"},
       {:phoenix_pubsub, "~> 2.0"},
+      {:websockex, "~> 0.4.3"},
       {:plug_cowboy, "~> 2.5"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},

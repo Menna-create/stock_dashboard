@@ -7,6 +7,8 @@ defmodule StockDashboard.Application do
 
   @impl true
   def start(_type, _args) do
+    finnhub_config = Application.get_env(:stock_dashboard, :finnhub)
+
     children = [
       StockDashboardWeb.Telemetry,
       StockDashboard.Repo,
@@ -17,7 +19,8 @@ defmodule StockDashboard.Application do
       # Start a worker by calling: StockDashboard.Worker.start_link(arg)
       # {StockDashboard.Worker, arg},
       # Start to serve requests, typically the last entry
-      StockDashboardWeb.Endpoint
+      StockDashboardWeb.Endpoint,
+      {StockDashboard.Finnhub, [api_key: finnhub_config[:api_key]]}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
