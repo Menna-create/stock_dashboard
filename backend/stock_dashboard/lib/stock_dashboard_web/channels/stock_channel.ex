@@ -11,8 +11,16 @@ defmodule StockDashboardWeb.StockChannel do
        {:ok, %{status: "connected to stock:lobby"}, socket}                            
      end                                                                               
                                                                                        
+     # Handle "ping" events from the client
+     def handle_in("ping", payload, socket) do
+       Logger.info("Received ping with payload: #{inspect(payload)}")
+       # Reply to the client; this will be received as a "phx_reply"
+       # for the message with the "ping" event.
+       {:reply, {:ok, %{response: "pong", received_message: payload["message"]}}, socket}
+     end
+                                                                                       
      # You can add handlers for messages from the client later, e.g.:                  
-     # def handle_in("ping", payload, socket) do                                       
+     # def handle_in("some_other_event", payload, socket) do                           
      #   {:reply, {:ok, payload}, socket}                                              
      # end                                                                             
                                                                                        
