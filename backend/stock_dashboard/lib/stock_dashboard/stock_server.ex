@@ -2,31 +2,23 @@ defmodule StockDashboard.StockServer do
   use GenServer
   require Logger
 
-  # For WebSocket communication
   alias WebSockex
 
   # Configuration for WebSocket connection and reconnection
   @websocket_base_url "wss://ws.finnhub.io"
-  @reconnect_initial_delay_ms 1_000 # Initial delay before first reconnect attempt
-  @reconnect_max_delay_ms 30_000   # Maximum delay between reconnect attempts
-  @max_reconnect_attempts 10       # Max number of attempts, or :infinity
+  @reconnect_initial_delay_ms 1_000
+  @reconnect_max_delay_ms 30_000
+  @max_reconnect_attempts 10
 
   # --- Public API ---
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
-
   @doc """
-  Subscribes to real-time trade updates for a given stock symbol.
+  Subscribes to real-time trade updates for a given stock symbol or list of symbols.
   """
   def subscribe(symbol) when is_binary(symbol) do
     GenServer.cast(__MODULE__, {:subscribe, symbol})
   end
 
-  @doc """
-  Subscribes to real-time trade updates for a list of stock symbols.
-  """
   def subscribe(symbols) when is_list(symbols) do
     Enum.each(symbols, &subscribe/1)
   end
@@ -38,21 +30,24 @@ defmodule StockDashboard.StockServer do
     GenServer.cast(__MODULE__, {:unsubscribe, symbol})
   end
 
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
   # --- GenServer Callbacks ---
 
   @impl true
   def init(_opts) do
-    # Using StockDashboard.Config module would be ideal here
-    api_key = ""d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0""
+    api_key = Application.fetch_env!(:stock_dashboard, :FINNHUB_API_KEY)
 
     state = %{
       api_key: api_key,
-      ws_client: nil,             # Holds the WebSockex client process PID
-      connected: false,           # Tracks WebSocket connection status
-      subscriptions: MapSet.new(), # Symbols we intend to be subscribed to
-      active_subscriptions: MapSet.new(), # Symbols Finnhub has confirmed
-      reconnect_attempts: 0,      # Counter for reconnection attempts
-      reconnect_timer: nil        # Reference to the reconnect timer
+      ws_client: nil,
+      connected: false,
+      subscriptions: MapSet.new(),
+      active_subscriptions: MapSet.new(),
+      reconnect_attempts: 0,
+      reconnect_timer: nil
     }
 
     {:ok, state, {:continue, :connect}}
@@ -63,7 +58,7 @@ defmodule StockDashboard.StockServer do
     do_connect(state)
   end
 
-  # --- WebSockex Callbacks (handled via handle_info) ---
+  # --- WebSockex Callbacks ---
 
   @impl true
   def handle_info({:websockex_connected, client_pid, _ws_state}, state) do
@@ -75,7 +70,6 @@ defmodule StockDashboard.StockServer do
       |> Map.put(:reconnect_attempts, 0)
       |> cancel_reconnect_timer()
 
-    # Subscribe to all symbols in our subscription list
     Enum.each(new_state.subscriptions, fn symbol ->
       send_subscribe_message(new_state.ws_client, symbol)
     end)
@@ -85,7 +79,7 @@ defmodule StockDashboard.StockServer do
 
   @impl true
   def handle_info({:websockex_disconnected, reason, _ws_state}, state) do
-    Logger.warning("StockServer: Disconnected from Finnhub WebSocket. Reason: #{inspect(reason)}", [])
+    Logger.warning("StockServer: Disconnected from Finnhub WebSocket. Reason: #{inspect(reason)}")
     new_state =
       state
       |> Map.put(:ws_client, nil)
@@ -100,7 +94,6 @@ defmodule StockDashboard.StockServer do
     case Jason.decode(msg_json) do
       {:ok, %{"type" => "trade", "data" => trades}} ->
         Logger.info("StockServer: Processing stock data: #{inspect(trades)}")
-        # TODO: Broadcast this data to other parts of your application
         {:noreply, state}
       {:ok, %{"type" => "ping"}} ->
         Logger.debug("StockServer: Received ping, sending pong.")
@@ -125,8 +118,6 @@ defmodule StockDashboard.StockServer do
     {:noreply, state}
   end
 
-  # --- Reconnection Logic ---
-
   @impl true
   def handle_info(:reconnect, state) do
     Logger.info("StockServer: Attempting to reconnect (attempt ##{state.reconnect_attempts + 1})...")
@@ -134,7 +125,7 @@ defmodule StockDashboard.StockServer do
     do_connect(new_state)
   end
 
-  # --- Internal Cast Handlers for public API ---
+  # --- Cast Handlers ---
 
   @impl true
   def handle_cast({:subscribe, symbol}, state) do
@@ -151,7 +142,10 @@ defmodule StockDashboard.StockServer do
   def handle_cast({:unsubscribe, symbol}, state) do
     new_subscriptions = MapSet.delete(state.subscriptions, symbol)
     new_active_subscriptions = MapSet.delete(state.active_subscriptions, symbol)
-    new_state = %{state | subscriptions: new_subscriptions, active_subscriptions: new_active_subscriptions}
+    new_state = %{state | 
+      subscriptions: new_subscriptions, 
+      active_subscriptions: new_active_subscriptions
+    }
 
     if state.connected && state.ws_client do
       send_unsubscribe_message(state.ws_client, symbol)
@@ -162,30 +156,27 @@ defmodule StockDashboard.StockServer do
   # --- Helper Functions ---
 
   defp do_connect(state) do
-    # Avoid multiple connection attempts if a client PID already exists
     if state.ws_client do
-      Logger.info("StockServer: Connection attempt skipped, client process seems to exist or connection is in progress.")
+      Logger.info("""
+      StockServer: Connection attempt skipped, 
+      client process seems to exist or connection is in progress.
+      """)
       {:noreply, state}
     else
-      # Create a WebSockex client with properly configured handlers
       ws_url = @websocket_base_url <> "?token=" <> state.api_key
-      Logger.info("StockServer: Connecting to Finnhub WebSocket at #{ws_url} (attempt ##{state.reconnect_attempts + 1})")
+      Logger.info("""
+      StockServer: Connecting to Finnhub WebSocket at #{ws_url} 
+      (attempt ##{state.reconnect_attempts + 1})
+      """)
 
-      # Create a new WebSockex client with our custom handlers
-      websocket_client = 
-        WebSockex.start_link(
-          ws_url, 
-          WebSocketClient, 
-          %{parent: self()},
-          [name: Module.concat(__MODULE__, WSClient)]
-        )
-
-      case websocket_client do
-        {:ok, client_pid} ->
-          # We'll get a :websockex_connected message when the connection is established
+      case WebSockex.start_link(ws_url, __MODULE__, %{}, []) do
+        {:ok, _client_pid} ->
           {:noreply, %{state | reconnect_attempts: state.reconnect_attempts + 1}}
         {:error, reason} ->
-          Logger.error("StockServer: Failed to start WebSockex connection. Reason: #{inspect(reason)}")
+          Logger.error("""
+          StockServer: Failed to start WebSockex connection. 
+          Reason: #{inspect(reason)}
+          """)
           schedule_reconnect(%{state | reconnect_attempts: state.reconnect_attempts + 1})
       end
     end
@@ -193,7 +184,10 @@ defmodule StockDashboard.StockServer do
 
   defp schedule_reconnect(state) do
     if @max_reconnect_attempts != :infinity && state.reconnect_attempts >= @max_reconnect_attempts do
-      Logger.error("StockServer: Max reconnection attempts (#{@max_reconnect_attempts}) reached. Stopping reconnection efforts.")
+      Logger.error("""
+      StockServer: Max reconnection attempts (#{@max_reconnect_attempts}) reached.
+      Stopping reconnection efforts.
+      """)
       {:noreply, cancel_reconnect_timer(state)}
     else
       delay = calculate_backoff_delay(state.reconnect_attempts)
@@ -204,7 +198,7 @@ defmodule StockDashboard.StockServer do
   end
 
   defp calculate_backoff_delay(attempts) do
-    base_delay = @reconnect_initial_delay_ms * (:math.pow(2, min(attempts, 6)))
+    base_delay = @reconnect_initial_delay_ms * :math.pow(2, min(attempts, 6))
     jitter = :rand.uniform(round(base_delay * 0.2))
     min(round(base_delay + jitter), @reconnect_max_delay_ms)
   end
@@ -221,7 +215,8 @@ defmodule StockDashboard.StockServer do
     Logger.info("StockServer: Sending subscribe message for #{symbol}")
     case WebSockex.send_frame(ws_client, {:text, Jason.encode!(payload)}) do
       :ok -> :ok
-      {:error, reason} -> Logger.error("StockServer: Failed to send subscribe for #{symbol}. Reason: #{inspect(reason)}")
+      {:error, reason} -> 
+        Logger.error("StockServer: Failed to send subscribe for #{symbol}. Reason: #{inspect(reason)}")
     end
   end
 
@@ -230,7 +225,8 @@ defmodule StockDashboard.StockServer do
     Logger.info("StockServer: Sending unsubscribe message for #{symbol}")
     case WebSockex.send_frame(ws_client, {:text, Jason.encode!(payload)}) do
       :ok -> :ok
-      {:error, reason} -> Logger.error("StockServer: Failed to send unsubscribe for #{symbol}. Reason: #{inspect(reason)}")
+      {:error, reason} -> 
+        Logger.error("StockServer: Failed to send unsubscribe for #{symbol}. Reason: #{inspect(reason)}")
     end
   end
 
@@ -238,47 +234,8 @@ defmodule StockDashboard.StockServer do
     payload = %{"type" => "pong"}
     case WebSockex.send_frame(ws_client, {:text, Jason.encode!(payload)}) do
       :ok -> :ok
-      {:error, reason} -> Logger.error("StockServer: Failed to send pong. Reason: #{inspect(reason)}")
+      {:error, reason} -> 
+        Logger.error("StockServer: Failed to send pong. Reason: #{inspect(reason)}")
     end
-  end
-end
-
-# A WebSockex client module for handling WebSocket events
-defmodule WebSocketClient do
-  use WebSockex
-  require Logger
-
-  def start_link(url, state) do
-    WebSockex.start_link(url, __MODULE__, state)
-  end
-
-  # WebSockex callbacks
-  @impl true
-  def handle_connect(conn, %{parent: parent} = state) do
-    send(parent, {:websockex_connected, self(), conn})
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_disconnect(%{reason: reason} = disconnect_map, %{parent: parent} = state) do
-    send(parent, {:websockex_disconnected, reason, disconnect_map})
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_frame(frame, %{parent: parent} = state) do
-    send(parent, {:websockex_frame, frame, state})
-    {:ok, state}
-  end
-
-  @impl true
-  def handle_cast({:send, frame}, state) do
-    {:reply, frame, state}
-  end
-
-  @impl true
-  def terminate(reason, %{parent: parent} = state) do
-    send(parent, {:websockex_disconnected, reason, state})
-    :ok
   end
 end

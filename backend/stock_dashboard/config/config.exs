@@ -7,10 +7,20 @@
 # General application configuration
 import Config
 
+# Your existing config
 config :stock_dashboard,
-  finnhub_api_key: System.get_env("FINNHUB_API_KEY") || "d0fpqo9r01qr6dbtj200d0fpqo9r01qr6dbtj20g",
+  finnhub_api_key: "d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0",
   ecto_repos: [StockDashboard.Repo],
   generators: [timestamp_type: :utc_datetime]
+
+# Add these new configurations that match what your modules are expecting
+# For StockDashboard.Finnhub module
+config :stock_dashboard, :finnhub,
+  api_key: System.get_env("FINNHUB_API_KEY") || "d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0"
+
+# For StockDashboard.StockServer module
+config :stock_dashboard, :FINNHUB_API_KEY, 
+  System.get_env("FINNHUB_API_KEY") || "d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0"
 
 # Configures the endpoint
 config :stock_dashboard, StockDashboardWeb.Endpoint,

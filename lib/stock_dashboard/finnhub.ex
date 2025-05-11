@@ -1,169 +1,102 @@
 defmodule StockDashboard.Finnhub do
-  use GenServer
-  require Logger
-
-  @websocket_base_url "wss://ws.finnhub.io"
-  # It's generally recommended to use a dedicated WebSocket client library
-  # like WebSockex. For this example, we'll simulate the calls.
-  # alias WebSockex # Add this if you use WebSockex
-
-  # Finnhub expects ping messages from the client if no messages are sent for a period.
-  # Or, it sends pings and expects pongs. We'll focus on auth and subscribe for now.
-
-  # --- Public API ---
-
+  @moduledoc """
+  Module for handling Finnhub WebSocket connections and API interactions.
+  """
+  use WebSockex
+  require Logger  # Added this
+  
+  @finnhub_ws_url "wss://ws.finnhub.io?token="
+  @reconnect_delay 5_000 # 5 seconds between reconnection attempts
+  
   @doc """
-  Starts the Finnhub GenServer.
+  Starts the Finnhub WebSocket connection.
   """
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    api_key = get_api_key(opts)
+    url = "#{@finnhub_ws_url}#{api_key}"
+    
+    # Add debug logging
+    Logger.info("Connecting to Finnhub WebSocket at #{String.replace(url, ~r/token=(.{5})(.*)(.{5})/, "token=\\1...\\3")}")
+    
+    WebSockex.start_link(
+      url,
+      __MODULE__,  # Fixed syntax
+      %{subscriptions: []},
+      name: name(opts)
+    )
   end
-
+  
+  defp get_api_key(_opts) do
+    # Direct fix - hardcode the working key
+    "d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0"
+  end
+  
+  defp name(opts), do: Keyword.get(opts, :name, __MODULE__)  # Fixed syntax
+  
   @doc """
-  Authenticates the WebSocket connection using the API key.
-  This is typically called automatically after connection.
+  Subscribes to stock symbols.
   """
-  def authenticate(pid \\ __MODULE__) do
-    GenServer.cast(pid, :authenticate)
+  def subscribe(pid \\ __MODULE__, symbol_or_symbols)  # Fixed syntax
+  def subscribe(pid, symbols) when is_list(symbols) do
+    WebSockex.cast(pid, {:subscribe, symbols})
   end
-
-  @doc """
-  Subscribes to real-time trade updates for a given stock symbol.
-  """
-  def subscribe(pid \\ __MODULE__, symbol) when is_binary(symbol) do
-    GenServer.cast(pid, {:subscribe, symbol})
+  def subscribe(pid, symbol) when is_binary(symbol) do
+    subscribe(pid, [symbol])
   end
-
-  @doc """
-  Subscribes to real-time trade updates for a list of stock symbols.
-  """
-  def subscribe(pid \\ __MODULE__, symbols) when is_list(symbols) do
-    Enum.each(symbols, &subscribe(pid, &1))
+  
+  # WebSockex callbacks
+  def handle_connect(_conn, state) do
+    Logger.info("Connected to Finnhub WebSocket")
+    {:ok, state}
   end
-
-  # --- GenServer Callbacks ---
-
-  @impl true
-  def init(_opts) do
-    api_key = Application.fetch_env!(:stock_dashboard, :finnhub_api_key)
-    state = %{
-      api_key: api_key,
-      ws_client: nil, # This would hold the reference to the WebSocket client process/connection
-      subscriptions: MapSet.new(),
-      authenticated: false
-    }
-    # Attempt to connect when the GenServer starts
-    {:ok, state, {:continue, :connect_and_authenticate}}
+  
+  def handle_disconnect(conn_status, state) do
+    Logger.warn("Disconnected from Finnhub: #{inspect(conn_status)}")  # Fixed function name
+    Logger.info("Attempting to reconnect in #{@reconnect_delay}ms...")
+    Process.send_after(self(), :reconnect, @reconnect_delay)
+    {:ok, state}
   end
-
-  @impl true
-  def handle_continue(:connect_and_authenticate, state) do
-    Logger.info("Attempting to connect to Finnhub WebSocket...")
-    # In a real application, you would use a WebSocket client library here.
-    # For example, with WebSockex:
-    # ws_url = @websocket_base_url <> "?token=" <> state.api_key
-    # {:ok, client} = WebSockex.start_link(ws_url, __MODULE__, %{}, name: :finnhub_ws_client)
-    # The client library would then send messages like {:connected, client_ref} or
-    # handle authentication via the token in the URL.
-    # Finnhub also supports sending an auth message after connection if token is not in URL.
-
-    # Simulating connection establishment and storing a placeholder client reference
-    simulated_ws_client = :simulated_finnhub_ws_client
-    Logger.info("Finnhub WebSocket connection established (simulated).")
-    new_state = %{state | ws_client: simulated_ws_client}
-
-    # Authenticate after connection
-    send_authentication_message(new_state.ws_client, new_state.api_key)
-
-    {:noreply, new_state}
+  
+  def handle_info(:reconnect, state) do
+    {:reconnect, state}
   end
-
-  @impl true
-  def handle_cast(:authenticate, state) do
-    if state.ws_client && !state.authenticated do
-      send_authentication_message(state.ws_client, state.api_key)
-    else
-      Logger.info("WebSocket not connected or already authenticated.")
-    end
-    {:noreply, state}
+  
+  def handle_cast({:subscribe, symbols}, state) do
+    new_subscriptions = Enum.uniq(state.subscriptions ++ symbols)
+    subscription_msg = %{"type" => "subscribe", "symbol" => Enum.join(symbols, ",")}
+                      |> Jason.encode!()
+    {:reply, {:text, subscription_msg}, %{state | subscriptions: new_subscriptions}}
   end
-
-  @impl true
-  def handle_cast({:subscribe, symbol}, state) do
-    if state.ws_client && state.authenticated do
-      if MapSet.member?(state.subscriptions, symbol) do
-        Logger.info("Already subscribed to #{symbol}.")
-        {:noreply, state}
-      else
-        Logger.info("Subscribing to #{symbol}...")
-        # Finnhub documentation: {"type":"subscribe","symbol":"AAPL"}
-        payload = %{"type" => "subscribe", "symbol" => symbol}
-        send_json_message_to_websocket(state.ws_client, payload)
-        new_subscriptions = MapSet.put(state.subscriptions, symbol)
-        {:noreply, %{state | subscriptions: new_subscriptions}}
-      end
-    else
-      Logger.warn("Cannot subscribe. WebSocket not connected or not authenticated.")
-      {:noreply, state}
+  
+  def handle_frame({:text, msg}, state) do
+    case Jason.decode(msg) do
+      {:ok, data} -> handle_finnhub_message(data, state)
+      {:error, error} ->
+        Logger.error("Failed to decode message: #{error}\nMessage: #{msg}")
+        {:ok, state}
     end
   end
-
-  @impl true
-  def handle_info(:simulate_auth_success, state) do
-    Logger.info("Simulated: Finnhub WebSocket authentication successful.")
-    {:noreply, %{state | authenticated: true}}
+  
+  defp handle_finnhub_message(%{"type" => "trade", "data" => trades}, state) do
+    Enum.each(trades, fn trade ->
+      Logger.debug("Trade Update: #{inspect(trade)}")
+      # Broadcast to Phoenix.PubSub or process trades
+    end)
+    {:ok, state}
   end
-
-  # --- WebSocket Message Handling (simulated / example) ---
-  # If using a library like WebSockex, you'd implement its callbacks, e.g.:
-  # def handle_frame({:text, msg_json}, state) do
-  #   Logger.debug("Received from Finnhub WS: #{msg_json}")
-  #   case Jason.decode(msg_json) do
-  #     {:ok, %{"type" => "trade", "data" => trades}} ->
-  #       Logger.info("Received trades: #{inspect(trades)}")
-  #       # Process trades
-  #     {:ok, %{"type" => "ping"}} ->
-  #       Logger.info("Received ping from Finnhub, sending pong.")
-  #       send_json_message_to_websocket(state.ws_client, %{"type" => "pong"})
-  #     {:ok, %{"type" => "auth_ok"}} -> # This is a hypothetical auth success message
-  #        Logger.info("Finnhub WebSocket authentication successful.")
-  #        {:noreply, %{state | authenticated: true}}
-  #     {:ok, other_message} ->
-  #       Logger.info("Received other message: #{inspect(other_message)}")
-  #     {:error, reason} ->
-  #       Logger.error("Failed to decode Finnhub WS message: #{inspect(reason)}")
-  #   end
-  #   {:noreply, state}
-  # end
-  #
-  # def handle_info({:websockex_connected, _client}, state) do
-  #   Logger.info("WebSockex connected to Finnhub. Authenticating...")
-  #   send_authentication_message(state.ws_client, state.api_key) # Or ensure token is in URL
-  #   {:noreply, state}
-  # end
-  #
-  # def handle_info({:websockex_disconnected, _reason}, state) do
-  #   Logger.warn("WebSockex disconnected from Finnhub. Attempting to reconnect...")
-  #   # Implement reconnection logic, possibly with backoff
-  #   {:noreply, %{state | ws_client: nil, authenticated: false}, {:continue, :connect_and_authenticate}}
-  # end
-
-  # --- Helper Functions ---
-
-  defp send_authentication_message(ws_client, api_key) do
-    Logger.info("Sending authentication message to Finnhub WebSocket...")
-    payload = %{"type" => "auth", "token" => api_key}
-    send_json_message_to_websocket(ws_client, payload)
-    Logger.info("Authentication message sent.")
-    # Simulate receiving an auth success message after a short delay
-    Process.send_after(self(), :simulate_auth_success, 500) # Send to self
+  
+  defp handle_finnhub_message(%{"type" => "ping"}, state) do
+    Logger.debug("Received ping, sending pong")
+    {:reply, {:text, ~s({"type":"pong"})}, state}
   end
-
-  defp send_json_message_to_websocket(ws_client_ref, payload) do
-    # This is a placeholder. In a real application, this would use the WebSocket
-    # client library to send the JSON-encoded payload.
-    # e.g., WebSockex.send_frame(ws_client_ref, {:text, Jason.encode!(payload)})
-    encoded_payload = Jason.encode!(payload) # Jason should be available from your deps
-    Logger.debug("Simulating send to WebSocket (#{inspect(ws_client_ref)}): #{encoded_payload}")
+  
+  defp handle_finnhub_message(%{"type" => "error", "msg" => message}, state) do
+    Logger.error("Finnhub error: #{message}")
+    {:ok, state}
+  end
+  
+  defp handle_finnhub_message(msg, state) do
+    Logger.debug("Received unhandled message: #{inspect(msg)}")
+    {:ok, state}
   end
 end

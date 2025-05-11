@@ -1,12 +1,11 @@
 import Config
 
-# config/runtime.exs is executed for all environments, including
-# during releases. It is executed after compilation and before the
-# system starts, so it is typically used to load production configuration
-# and secrets from environment variables or elsewhere. Do not define
-# any compile-time configuration in here, as it won't be applied.
-# The block below contains prod specific runtime configuration.
+# Only load this in production
+if config_env() == :prod do
+  # Configure Finnhub API for production
+  config :stock_dashboard, :finnhub,
+    api_key: "d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0"
 
-if base_url = System.get_env("FINNHUB_API_BASE_URI") do
-  config :finnhub_api, base_url: base_url
+  # For StockServer
+  config :stock_dashboard, :FINNHUB_API_KEY, System.fetch_env!("FINNHUB_API_KEY")
 end
