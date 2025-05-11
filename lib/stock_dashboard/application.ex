@@ -19,7 +19,7 @@ defmodule StockDashboard.Application do
       # StockDashboardWeb.Endpoint,
       #
       # Add the StockServer to the supervision tree
-      StockDashboard.StockServer
+      # StockDashboard.StockServer # Temporarily comment this out
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
