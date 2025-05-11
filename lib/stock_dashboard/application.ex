@@ -24,7 +24,7 @@ defmodule StockDashboard.Application do
       {StockDashboard.Finnhub, []},  # No need to pass the token, it's hardcoded now
       
       # Comment out StockServer temporarily for testing
-      # StockDashboard.StockServer,
+      StockDashboard.StockServer,
       
       # Start the Phoenix endpoint (must be last)
       StockDashboardWeb.Endpoint
