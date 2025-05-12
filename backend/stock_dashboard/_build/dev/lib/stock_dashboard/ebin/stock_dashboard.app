@@ -1,7 +1,7 @@
 {application,stock_dashboard,
     [{modules,
          ['Elixir.StockDashboard','Elixir.StockDashboard.Application',
-          'Elixir.StockDashboard.Finnhub',
+          'Elixir.StockDashboard.DataUtils','Elixir.StockDashboard.Finnhub',
           'Elixir.StockDashboard.Finnhub.WebSocketClient',
           'Elixir.StockDashboard.Mailer','Elixir.StockDashboard.PubSub',
           'Elixir.StockDashboard.Repo','Elixir.StockDashboardWeb',
