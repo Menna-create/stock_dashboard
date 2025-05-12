@@ -92,6 +92,56 @@ defmodule StockDashboardWeb.StockChannel do
       {:noreply, socket}
     end
   end
+  
+  # Handle stock updates for a specific symbol
+  def handle_info({:stock_update, symbol, data}, socket) do
+    # Only broadcast if this is the right symbol channel
+    if socket.assigns[:symbol] == symbol do
+      # Rate limit broadcasts to prevent overwhelming the client
+      if should_broadcast?(socket, "#{symbol}_update") do
+        push(socket, "stock_data_update", %{
+          symbol: symbol, 
+          data: %{
+            price: data.current_price,
+            change: calculate_percentage_change(data.current_price, data.opening_price),
+            volume: data.volume,
+            high: data.high_price,
+            low: data.low_price,
+            updated_at: data.updated_at
+          }
+        })
+        socket = update_last_broadcast(socket, "#{symbol}_update")
+        {:noreply, socket}
+      else
+        {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+  
+  # Handle all stocks updates
+  def handle_info({:all_stocks, stocks}, socket) do
+    # Rate limit broadcasts to prevent overwhelming the client
+    if should_broadcast?(socket, "all_stocks") do
+      formatted_stocks = Enum.map(stocks, fn {symbol, data} -> 
+        {symbol, %{
+          price: data.current_price,
+          change: calculate_percentage_change(data.current_price, data.opening_price),
+          volume: data.volume,
+          high: data.high_price,
+          low: data.low_price,
+          updated_at: data.updated_at
+        }} 
+      end) |> Enum.into(%{})
+      
+      push(socket, "all_stocks_update", %{stocks: formatted_stocks})
+      socket = update_last_broadcast(socket, "all_stocks")
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
 
   # Private functions for rate limiting
   
@@ -108,4 +158,11 @@ defmodule StockDashboardWeb.StockChannel do
     last_broadcast = Map.put(socket.assigns.last_broadcast, key, now)
     assign(socket, :last_broadcast, last_broadcast)
   end
+  
+  # Helper function to calculate percentage change
+  defp calculate_percentage_change(current, opening) when is_number(current) and is_number(opening) and opening > 0 do
+    ((current - opening) / opening * 100)
+    |> Float.round(2)
+  end
+  defp calculate_percentage_change(_, _), do: 0.0
 end

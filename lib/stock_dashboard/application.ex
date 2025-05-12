@@ -36,6 +36,8 @@ defmodule StockDashboard.Application do
 
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
+        # Start periodic broadcasts after supervisor is started
+        StockDashboard.Finnhub.start_periodic_broadcasts()
         {:ok, pid}
       {:error, reason} ->
         Logger.error("Failed to start application: #{inspect(reason)}")

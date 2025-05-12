@@ -26,6 +26,13 @@ defmodule StockDashboard.Finnhub do
   def subscribe(symbol) when is_binary(symbol), do: GenServer.cast(__MODULE__, {:subscribe, symbol})
   def subscribe(symbols) when is_list(symbols), do: Enum.each(symbols, &subscribe/1)
   def unsubscribe(symbol) when is_binary(symbol), do: GenServer.cast(__MODULE__, {:unsubscribe, symbol})
+  
+  @doc """
+  Start periodic broadcasts of all stock data.
+  """
+  def start_periodic_broadcasts(interval_ms \\ 5000) do
+    GenServer.cast(__MODULE__, {:start_periodic_broadcasts, interval_ms})
+  end
 
   # ETS data access functions
   @doc """
@@ -163,6 +170,22 @@ defmodule StockDashboard.Finnhub do
     new_state = %{state | reconnect_timer: nil}
     do_connect(new_state)
   end
+  
+  @impl true
+  def handle_info(:broadcast_all_stocks, state) do
+    # Get all stock data
+    all_stocks = get_all_stocks()
+    
+    # Broadcast to PubSub if we have any stocks
+    if map_size(all_stocks) > 0 do
+      StockDashboard.PubSub.broadcast_all_stocks(all_stocks)
+    end
+    
+    # Schedule the next broadcast
+    Process.send_after(self(), :broadcast_all_stocks, 5000)
+    
+    {:noreply, state}
+  end
 
   # Subscription management
   @impl true
@@ -180,6 +203,13 @@ defmodule StockDashboard.Finnhub do
     }
     if state.connected, do: send_unsubscribe_message(state.ws_client, symbol)
     {:noreply, new_state}
+  end
+  
+  @impl true
+  def handle_cast({:start_periodic_broadcasts, interval_ms}, state) do
+    # Schedule the first broadcast
+    Process.send_after(self(), :broadcast_all_stocks, interval_ms)
+    {:noreply, state}
   end
 
   # Private functions
@@ -292,6 +322,9 @@ defmodule StockDashboard.Finnhub do
     
     # Store the updated data
     :ets.insert(@stock_data_table, {symbol, new_data})
+    
+    # Broadcast the updated stock data
+    StockDashboard.PubSub.broadcast_stock_update(symbol, new_data)
     
     # Broadcast the updated stock data
     StockDashboard.PubSub.broadcast_stock_update(symbol, new_data)
