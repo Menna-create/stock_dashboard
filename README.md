@@ -14,17 +14,7 @@ backend and frontend components:
  • The frontend is built with Svelte, offering a responsive
    and interactive user interface                          
 
-
-Screenshots                                                
-
-🌆 Dashboard Overview  Main dashboard showing multiple stoc
-real-time data                                             
-
-🌆 Stock Detail View  Detailed view of a single stock with 
-performance charts                                         
-
-🌆 Customization Panel  User interface for customizing dash
-tracked stocks                                             
+                                       
 
 
 Architecture                                               
