@@ -1,12 +1,10 @@
 defmodule StockDashboard.Application do
   @moduledoc false
   use Application
-  require Logger  # Added Logger requirement
-  
+  require Logger
+
   @impl true
   def start(_type, _args) do
-    # Start the Finnhub client with the working token directly
-    # Comment out the conditional logic that was causing issues
     children = [
       # Start the Telemetry supervisor
       StockDashboardWeb.Telemetry,
@@ -18,19 +16,15 @@ defmodule StockDashboard.Application do
       {Phoenix.PubSub, name: StockDashboard.PubSub},
       # Start Finch HTTP client for external requests
       {Finch, name: StockDashboard.Finch},
-      
-      # Start Finnhub WebSocket connection with hardcoded working token
-      # For testing, use only one of the Finnhub clients
-      {StockDashboard.Finnhub, []},  # No need to pass the token, it's hardcoded now
-      
-      # Comment out StockServer temporarily for testing
-      StockDashboard.StockServer,
+
+      # Use Finnhub for WebSocket connection and stock data management
+      StockDashboard.Finnhub,
       
       # Start the Phoenix endpoint (must be last)
       StockDashboardWeb.Endpoint
     ]
     |> Enum.reject(&is_nil/1) # Remove any nil children
-    
+
     # Configure supervisor options
     opts = [
       strategy: :one_for_one,
@@ -39,7 +33,7 @@ defmodule StockDashboard.Application do
       max_restarts: 5,
       max_seconds: 5
     ]
-    
+
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
         {:ok, pid}
@@ -49,7 +43,7 @@ defmodule StockDashboard.Application do
         {:error, reason}
     end
   end
-  
+
   @impl true
   def config_change(changed, _new, removed) do
     StockDashboardWeb.Endpoint.config_change(changed, removed)

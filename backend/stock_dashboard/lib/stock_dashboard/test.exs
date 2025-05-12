@@ -10,7 +10,7 @@ defmodule FinnhubTest do
 
   def start_link do
     # Use the exact token that worked in your manual test
-    token = "d0gf7bhr01qhao4t9ptgd0gf7bhr01qhao4t9pu0"
+    token = "d0gghcpr01qhao4thkggd0gghcpr01qhao4thkh0"
     url = "wss://ws.finnhub.io?token=#{token}"
     
     IO.puts("Connecting to: #{url}")

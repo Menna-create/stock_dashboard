@@ -22,8 +22,7 @@ defmodule StockDashboard.Application do
       StockDashboardWeb.Endpoint,
       # Start Finnhub client
       {StockDashboard.Finnhub, [api_key: finnhub_config[:api_key]]},
-      # Start StockServer worker
-      StockDashboard.StockServer
+     
     ]
 
     opts = [strategy: :one_for_one, name: StockDashboard.Supervisor]
@@ -35,4 +34,4 @@ defmodule StockDashboard.Application do
     StockDashboardWeb.Endpoint.config_change(changed, removed)
     :ok
   end
-end
+end 
